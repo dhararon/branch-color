@@ -1,0 +1,53 @@
+#!/bin/bash
+
+check_output() {
+    result=$(eval "$1")
+    echo "$result"
+}
+
+validate_branch() {
+
+    if [[ $branch == "main" || $branch == "master" ]]; then
+        echo "main"
+        return
+    elif [[ $branch == "staging" ]]; then
+        echo "staging"
+        return
+    elif [[ $branch == "development" ]]; then
+        echo "development"
+        return
+    elif [[ $branch == "feature"* ]]; then
+        echo "features"
+        return
+    elif [[ $branch == "hotfix"* ]]; then
+        echo "hotfixes"
+        return
+    elif [[ $branch == "release"* ]]; then
+        echo "releases"
+        return
+    else
+        echo "fail"
+        return
+    fi
+}
+
+vscode_folder_name=".vscode"
+vscode_settings_name="settings.json"
+
+is_branch_change=${3:-0}
+
+if [[ $is_branch_change -ne 1 ]]; then
+    exit 0
+fi
+
+if [[ ! -d $vscode_folder_name ]]; then
+    mkdir $vscode_folder_name
+    touch "${vscode_folder_name}/settings.json"
+fi
+
+branch=$(git rev-parse --abbrev-ref HEAD)
+branch_color=$(validate_branch "$branch")
+
+color=$(cat ".git/hooks/colors/${branch_color}.json")
+settings_path="${vscode_folder_name}/${vscode_settings_name}"
+echo "$color" >"$settings_path"
