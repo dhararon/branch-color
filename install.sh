@@ -22,7 +22,7 @@ if [ -d /tmp/branch-color ] ; then
 fi
 
 echo "Downloading branch color project ..."
-git clone git@github.com:PixelFlowMX/branch-color.git /tmp/branch-color
+git clone git@github.com:dhararon/branch-color.git /tmp/branch-color
 
 echo "Copying files to git hooks ..."
 
