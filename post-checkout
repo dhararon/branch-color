@@ -1,53 +1,90 @@
 #!/bin/bash
 
-check_output() {
-    result=$(eval "$1")
-    echo "$result"
+# Script para cambiar los colores de VSCode según la rama de git
+# Este hook se ejecuta después de un git checkout
+
+set -e  # Salir inmediatamente si un comando falla
+set -u  # Tratar variables no definidas como error
+
+# Colores para mensajes
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Función para mensajes informativos
+info() {
+    echo -e "${GREEN}[INFO]${NC} $@"
 }
 
-validate_branch() {
+# Función para mensajes de error
+error() {
+    echo -e "${RED}[ERROR]${NC} $@" >&2
+}
 
-    if [[ $branch == "main" || $branch == "master" ]]; then
+# Función para validar y determinar el tipo de rama
+validate_branch() {
+    local branch="$1"
+    
+    if [[ $branch =~ ^(main|master)$ ]]; then
         echo "main"
-        return
     elif [[ $branch == "staging" ]]; then
         echo "staging"
-        return
     elif [[ $branch == "development" ]]; then
         echo "development"
-        return
-    elif [[ $branch == "feature"* ]]; then
+    elif [[ $branch == feature/* || $branch == features/* ]]; then
         echo "features"
-        return
-    elif [[ $branch == "hotfix"* ]]; then
+    elif [[ $branch == hotfix/* || $branch == hotfixes/* ]]; then
         echo "hotfixes"
-        return
-    elif [[ $branch == "release"* ]]; then
+    elif [[ $branch == release/* || $branch == releases/* ]]; then
         echo "releases"
-        return
     else
         echo "fail"
-        return
     fi
 }
 
-vscode_folder_name=".vscode"
-vscode_settings_name="settings.json"
+# Constantes para directorios y archivos
+VSCODE_FOLDER=".vscode"
+SETTINGS_FILE="settings.json"
+SETTINGS_PATH="${VSCODE_FOLDER}/${SETTINGS_FILE}"
+HOOKS_COLOR_DIR=".git/hooks/colors"
 
+# Hook de post-checkout recibe 3 parámetros:
+# $1: commit SHA-1 anterior
+# $2: commit SHA-1 nuevo
+# $3: 1 si es un cambio de rama, 0 si es un checkout de archivo
+
+# Verificar si es un cambio de rama
 is_branch_change=${3:-0}
 
 if [[ $is_branch_change -ne 1 ]]; then
+    # No es un cambio de rama, salir sin hacer nada
     exit 0
 fi
 
-if [[ ! -d $vscode_folder_name ]]; then
-    mkdir $vscode_folder_name
-    touch "${vscode_folder_name}/settings.json"
+# Crear directorio .vscode si no existe
+if [[ ! -d $VSCODE_FOLDER ]]; then
+    mkdir -p "$VSCODE_FOLDER"
 fi
 
+# Obtener el nombre de la rama actual
 branch=$(git rev-parse --abbrev-ref HEAD)
-branch_color=$(validate_branch "$branch")
 
-color=$(cat ".git/hooks/colors/${branch_color}.json")
-settings_path="${vscode_folder_name}/${vscode_settings_name}"
-echo "$color" >"$settings_path"
+# Validar la rama y obtener el tipo
+branch_type=$(validate_branch "$branch")
+
+# Ruta al archivo de configuración de color
+color_file="${HOOKS_COLOR_DIR}/${branch_type}.json"
+
+# Verificar que exista el archivo de color
+if [[ ! -f "$color_file" ]]; then
+    error "No se encontró la configuración de color para la rama: $branch_type"
+    error "Asegúrate de que el archivo $color_file existe"
+    exit 1
+fi
+
+# Leer el archivo de color y escribirlo en la configuración de VSCode
+cat "$color_file" > "$SETTINGS_PATH"
+
+# Informar al usuario
+info "VSCode color cambiado para rama: $branch (tipo: $branch_type)"
